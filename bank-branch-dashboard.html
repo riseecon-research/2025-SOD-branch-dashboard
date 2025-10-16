@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Branch Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.cdnfonts.com/css/greycliff-cf');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Greycliff CF', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #FAC5C0;
+            color: #2d3748;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            background: #571B60;
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #571B60;
+        }
+
+        .badge {
+            background: #F36E41;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #571B60;
+            box-shadow: 0 0 0 3px rgba(87, 27, 96, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+
+        .map-container {
+            grid-row: 2 / 4;
+            background: #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            max-width: 250px;
+        }
+
+        .map-controls h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #571B60;
+            margin-bottom: 12px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #4a5568;
+            cursor: pointer;
+            padding: 6px 0;
+        }
+
+        .control-group input[type="radio"] {
+            margin-right: 8px;
+            accent-color: #571B60;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            font-size: 12px;
+        }
+
+        .legend h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #571B60;
+            margin-bottom: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 12px;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background: #f7fafc;
+            z-index: 10;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tbody tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        tbody tr:hover {
+            background: #f7fafc;
+        }
+
+        .bank-name {
+            font-weight: 600;
+            color: #571B60;
+        }
+
+        .address {
+            color: #718096;
+            font-size: 12px;
+        }
+
+        .count {
+            background: #FAC5C0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: #571B60;
+            text-align: center;
+        }
+
+        .filter-chips {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 6px 12px;
+            background: #edf2f7;
+            border-radius: 16px;
+            font-size: 12px;
+            color: #4a5568;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chip:hover {
+            background: #e2e8f0;
+        }
+
+        .chip.active {
+            background: #571B60;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🏦 California Bank Branch Dashboard</h1>
+            <p>Interactive visualization of bank locations and branch distribution across counties</p>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Search by Bank</span>
+                <span class="badge">342 Banks</span>
+            </div>
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="bankSearch" placeholder="Search for a bank (e.g., Wells Fargo, Chase, Bank of America...)">
+            </div>
+            <div class="filter-chips">
+                <div class="chip active" data-filter="all">All Banks</div>
+                <div class="chip" data-filter="major">Major Banks</div>
+                <div class="chip" data-filter="credit-union">Credit Unions</div>
+                <div class="chip" data-filter="regional">Regional</div>
+            </div>
+            <div class="table-container">
+                <table id="bankTable">
+                    <thead>
+                        <tr>
+                            <th>Bank Name</th>
+                            <th>Address</th>
+                            <th>County</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bankTableBody">
+                        <!-- Sample data -->
+                        <tr>
+                            <td><span class="bank-name">Wells Fargo Bank</span></td>
+                            <td><span class="address">1850 Gateway Blvd, Concord</span></td>
+                            <td>Contra Costa</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">Chase Bank</span></td>
+                            <td><span class="address">2300 16th St, San Francisco</span></td>
+                            <td>San Francisco</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">Bank of America</span></td>
+                            <td><span class="address">3500 El Camino Real, Palo Alto</span></td>
+                            <td>Santa Clara</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">U.S. Bank</span></td>
+                            <td><span class="address">750 B St, San Diego</span></td>
+                            <td>San Diego</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">Citibank</span></td>
+                            <td><span class="address">555 California St, San Francisco</span></td>
+                            <td>San Francisco</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">PNC Bank</span></td>
+                            <td><span class="address">1234 Market St, Oakland</span></td>
+                            <td>Alameda</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">Union Bank</span></td>
+                            <td><span class="address">445 S Figueroa St, Los Angeles</span></td>
+                            <td>Los Angeles</td>
+                        </tr>
+                        <tr>
+                            <td><span class="bank-name">First Republic Bank</span></td>
+                            <td><span class="address">111 Pine St, San Francisco</span></td>
+                            <td>San Francisco</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel map-container">
+            <div id="map"></div>
+            
+            <div class="map-controls">
+                <h3>Tract Overlay Filter</h3>
+                <div class="control-group">
+                    <label>
+                        <input type="radio" name="tractFilter" value="none" checked>
+                        None
+                    </label>
+                    <label>
+                        <input type="radio" name="tractFilter" value="minority">
+                        Majority Minority
+                    </label>
+                    <label>
+                        <input type="radio" name="tractFilter" value="income">
+                        Low/Moderate Income
+                    </label>
+                    <label>
+                        <input type="radio" name="tractFilter" value="both">
+                        Both (Majority Minority & LMI)
+                    </label>
+                </div>
+            </div>
+
+            <div class="legend" id="legend">
+                <h4>Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F36E41;"></div>
+                    <span>Bank Branches</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Branches by County</span>
+                <span class="badge">58 Counties</span>
+            </div>
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="countySearch" placeholder="Search for a county...">
+            </div>
+            <div class="table-container">
+                <table id="countyTable">
+                    <thead>
+                        <tr>
+                            <th>County</th>
+                            <th>Bank Name</th>
+                            <th style="text-align: center;">Branches</th>
+                        </tr>
+                    </thead>
+                    <tbody id="countyTableBody">
+                        <!-- Sample data -->
+                        <tr>
+                            <td>Los Angeles</td>
+                            <td><span class="bank-name">Wells Fargo Bank</span></td>
+                            <td style="text-align: center;"><span class="count">247</span></td>
+                        </tr>
+                        <tr>
+                            <td>Los Angeles</td>
+                            <td><span class="bank-name">Chase Bank</span></td>
+                            <td style="text-align: center;"><span class="count">189</span></td>
+                        </tr>
+                        <tr>
+                            <td>Los Angeles</td>
+                            <td><span class="bank-name">Bank of America</span></td>
+                            <td style="text-align: center;"><span class="count">156</span></td>
+                        </tr>
+                        <tr>
+                            <td>San Diego</td>
+                            <td><span class="bank-name">Wells Fargo Bank</span></td>
+                            <td style="text-align: center;"><span class="count">98</span></td>
+                        </tr>
+                        <tr>
+                            <td>San Diego</td>
+                            <td><span class="bank-name">Chase Bank</span></td>
+                            <td style="text-align: center;"><span class="count">72</span></td>
+                        </tr>
+                        <tr>
+                            <td>Orange</td>
+                            <td><span class="bank-name">Bank of America</span></td>
+                            <td style="text-align: center;"><span class="count">87</span></td>
+                        </tr>
+                        <tr>
+                            <td>Santa Clara</td>
+                            <td><span class="bank-name">Wells Fargo Bank</span></td>
+                            <td style="text-align: center;"><span class="count">64</span></td>
+                        </tr>
+                        <tr>
+                            <td>San Francisco</td>
+                            <td><span class="bank-name">Chase Bank</span></td>
+                            <td style="text-align: center;"><span class="count">53</span></td>
+                        </tr>
+                        <tr>
+                            <td>Alameda</td>
+                            <td><span class="bank-name">Wells Fargo Bank</span></td>
+                            <td style="text-align: center;"><span class="count">45</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the map centered on California
+        const map = L.map('map').setView([37.0, -119.5], 6);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Store layer groups and data
+        let tractLayer = null;
+        let branchMarkers = L.layerGroup().addTo(map);
+        let allBranches = [];
+        let branchCountsByCounty = {};
+
+        // Load and process bank branch CSV data
+        Papa.parse('bank_branches.csv', {
+            download: true,
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                allBranches = results.data;
+                console.log(`Loaded ${allBranches.length} bank branches`);
+                
+                // Add branch markers to map
+                addBranchesToMap(allBranches);
+                
+                // Populate tables
+                populateBankTable(allBranches);
+                populateCountyTable(allBranches);
+                
+                // Update badge counts
+                updateBadgeCounts();
+            },
+            error: function(error) {
+                console.error('Error loading bank branch data:', error);
+                alert('Error loading bank branch data. Make sure bank_branches.csv is in the same folder.');
+            }
+        });
+
+        // Function to add branches to map
+        function addBranchesToMap(branches) {
+            branchMarkers.clearLayers();
+            
+            branches.forEach(branch => {
+                const lat = branch.SIMS_LATITUDE;
+                const lng = branch.SIMS_LONGITUDE;
+                const bankName = branch.NAMEFULL || 'Unknown Bank';
+                const branchName = branch.NAMEBR || 'Branch';
+                const address = branch.ADDRESBR || '';
+                const city = branch.CITYBR || '';
+                const zip = branch.ZIPBR || '';
+                
+                if (lat && lng) {
+                    L.circleMarker([lat, lng], {
+                        radius: 6,
+                        fillColor: '#F36E41',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).bindPopup(`
+                        <strong>${bankName}</strong><br>
+                        ${branchName}<br>
+                        ${address}<br>
+                        ${city}, CA ${zip}
+                    `).addTo(branchMarkers);
+                }
+            });
+        }
+
+        // Function to populate bank table
+        function populateBankTable(branches) {
+            const tbody = document.getElementById('bankTableBody');
+            tbody.innerHTML = '';
+            
+            // Get unique banks (limit to reasonable number for display)
+            const displayBranches = branches.slice(0, 100);
+            
+            displayBranches.forEach(branch => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><span class="bank-name">${branch.NAMEFULL || 'Unknown'}</span></td>
+                    <td><span class="address">${branch.ADDRESBR || ''}, ${branch.CITYBR || ''}</span></td>
+                    <td>${branch.CNTYNAMB || ''}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Function to populate county table
+        function populateCountyTable(branches) {
+            const tbody = document.getElementById('countyTableBody');
+            tbody.innerHTML = '';
+            
+            // Count branches by county and bank
+            const countyBankCounts = {};
+            
+            branches.forEach(branch => {
+                const county = branch.CNTYNAMB || 'Unknown';
+                const bank = branch.NAMEFULL || 'Unknown';
+                
+                if (!countyBankCounts[county]) {
+                    countyBankCounts[county] = {};
+                }
+                
+                if (!countyBankCounts[county][bank]) {
+                    countyBankCounts[county][bank] = 0;
+                }
+                
+                countyBankCounts[county][bank]++;
+            });
+            
+            // Convert to sorted array and display top results
+            const countyBankArray = [];
+            Object.keys(countyBankCounts).forEach(county => {
+                Object.keys(countyBankCounts[county]).forEach(bank => {
+                    countyBankArray.push({
+                        county: county,
+                        bank: bank,
+                        count: countyBankCounts[county][bank]
+                    });
+                });
+            });
+            
+            // Sort by count descending
+            countyBankArray.sort((a, b) => b.count - a.count);
+            
+            // Display top 50 results
+            countyBankArray.slice(0, 50).forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.county}</td>
+                    <td><span class="bank-name">${item.bank}</span></td>
+                    <td style="text-align: center;"><span class="count">${item.count}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Function to update badge counts
+        function updateBadgeCounts() {
+            // Count unique banks
+            const uniqueBanks = new Set(allBranches.map(b => b.NAMEFULL));
+            document.querySelector('.panel:nth-child(2) .badge').textContent = `${uniqueBanks.size} Banks`;
+            
+            // Count unique counties
+            const uniqueCounties = new Set(allBranches.map(b => b.CNTYNAMB));
+            document.querySelector('.panel:nth-child(4) .badge').textContent = `${uniqueCounties.size} Counties`;
+        }
+
+        // Helper function to capitalize text properly
+        function capitalizeText(text) {
+            if (!text) return 'N/A';
+            return text.split('-').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join('-').split(' ').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+        }
+
+        // Function to style tract features based on filter
+        function getTractStyle(feature, filterType) {
+            const raceCategory = feature.properties['Tract Race Category'];
+            const incomeCategory = feature.properties['Tract Income Category'];
+            
+            // Check if tract is majority minority
+            const isMajorityMinority = raceCategory && raceCategory.toLowerCase() === 'majority-minority';
+            
+            // Check if tract is low/moderate income
+            const isLowModIncome = incomeCategory && 
+                (incomeCategory.toLowerCase() === 'low income' || 
+                 incomeCategory.toLowerCase() === 'moderate income');
+            
+            let fillColor = '#cccccc';
+            let fillOpacity = 0.3;
+
+            if (filterType === 'minority' && isMajorityMinority) {
+                fillColor = '#9055A2';
+                fillOpacity = 0.6;
+            } else if (filterType === 'income' && isLowModIncome) {
+                fillColor = '#FAC5C0';
+                fillOpacity = 0.6;
+            } else if (filterType === 'both' && isMajorityMinority && isLowModIncome) {
+                fillColor = '#571B60';
+                fillOpacity = 0.7;
+            } else if (filterType !== 'none') {
+                fillOpacity = 0.1;
+            }
+
+            return {
+                fillColor: fillColor,
+                weight: 1,
+                opacity: 0.5,
+                color: '#666',
+                fillOpacity: fillOpacity
+            };
+        }
+
+        // Function to update legend based on filter
+        function updateLegend(filterType) {
+            const legend = document.getElementById('legend');
+            let legendHTML = '<h4>Legend</h4>';
+            
+            legendHTML += '<div class="legend-item"><div class="legend-color" style="background: #F36E41;"></div><span>Bank Branches</span></div>';
+            
+            if (filterType === 'minority') {
+                legendHTML += '<div class="legend-item"><div class="legend-color" style="background: #9055A2;"></div><span>Majority Minority</span></div>';
+            } else if (filterType === 'income') {
+                legendHTML += '<div class="legend-item"><div class="legend-color" style="background: #FAC5C0;"></div><span>Low/Moderate Income</span></div>';
+            } else if (filterType === 'both') {
+                legendHTML += '<div class="legend-item"><div class="legend-color" style="background: #571B60;"></div><span>Both MM & LMI</span></div>';
+            }
+            
+            legend.innerHTML = legendHTML;
+        }
+
+        // Function to load and display tract GeoJSON
+        function loadTractLayer(filterType) {
+            // Remove existing tract layer
+            if (tractLayer) {
+                map.removeLayer(tractLayer);
+            }
+
+            if (filterType === 'none') {
+                updateLegend('none');
+                return;
+            }
+
+            // Relative path to your tract GeoJSON file (must be in same folder as HTML)
+            const tractDataUrl = 'tract_minority_income_final.geojson';
+
+            // For demonstration, using a sample GeoJSON structure
+            // Replace this with: fetch(tractDataUrl)
+            const sampleTractData = {
+                "type": "FeatureCollection",
+                "features": [
+                    // Sample features - replace with your actual data
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "GEOID": "06037137000",
+                            "Tract Race Category": "majority-minority",
+                            "Tract Income Category": "low income"
+                        },
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[
+                                [-118.3, 34.1],
+                                [-118.2, 34.1],
+                                [-118.2, 34.0],
+                                [-118.3, 34.0],
+                                [-118.3, 34.1]
+                            ]]
+                        }
+                    }
+                ]
+            };
+
+            // To use your actual data, uncomment this and comment out the sample above:
+            
+            fetch(tractDataUrl)
+                .then(response => response.json())
+                .then(data => {
+                    tractLayer = L.geoJSON(data, {
+                        style: feature => getTractStyle(feature, filterType),
+                        onEachFeature: (feature, layer) => {
+                            const geoid = feature.properties.GEOID || 'N/A';
+                            const raceCategory = capitalizeText(feature.properties['Tract Race Category']);
+                            const incomeCategory = capitalizeText(feature.properties['Tract Income Category']);
+                            
+                            layer.bindPopup(`
+                                <strong>Tract: ${geoid}</strong><br>
+                                Race Category: ${raceCategory}<br>
+                                Income Category: ${incomeCategory}
+                            `);
+                        }
+                    }).addTo(map);
+                    
+                    updateLegend(filterType);
+                })
+                .catch(error => {
+                    console.error('Error loading tract data:', error);
+                    alert('Error loading tract data. Make sure the file path is correct and the file is accessible.');
+                });
+            
+
+            // Using sample data for demonstration
+            /*
+            tractLayer = L.geoJSON(sampleTractData, {
+                style: feature => getTractStyle(feature, filterType),
+                onEachFeature: (feature, layer) => {
+                    const geoid = feature.properties.GEOID || 'N/A';
+                    const raceCategory = capitalizeText(feature.properties['Tract Race Category']);
+                    const incomeCategory = capitalizeText(feature.properties['Tract Income Category']);
+                    
+                    layer.bindPopup(`
+                        <strong>Tract: ${geoid}</strong><br>
+                        Race Category: ${raceCategory}<br>
+                        Income Category: ${incomeCategory}
+                    `);
+                }
+            }).addTo(map);
+            
+            updateLegend(filterType);
+            */
+        }
+
+        // Handle filter changes
+        document.querySelectorAll('input[name="tractFilter"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                loadTractLayer(e.target.value);
+            });
+        });
+
+        // Search functionality for bank table
+        const bankSearch = document.getElementById('bankSearch');
+        const countySearch = document.getElementById('countySearch');
+
+        bankSearch.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.getElementById('bankTableBody').getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            }
+        });
+
+        countySearch.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.getElementById('countyTableBody').getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            }
+        });
+
+        // Filter chips
+        const chips = document.querySelectorAll('.chip');
+        chips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                chips.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Row click highlighting
+        const allRows = document.querySelectorAll('tbody tr');
+        allRows.forEach(row => {
+            row.addEventListener('click', function() {
+                allRows.forEach(r => r.style.background = '');
+                this.style.background = '#edf6ff';
+            });
+        });
+    </script>
+</body>
+</html>
